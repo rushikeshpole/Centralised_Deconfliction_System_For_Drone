@@ -1,0 +1,36 @@
+# Deconfliction System Configuration
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 5000
+  debug: true
+
+# Drone Configuration
+drones:
+  count: 5
+  ports:
+    - 14550
+    - 14560
+    - 14570
+    - 14580
+    - 14590
+  default_altitude: 10.0  # meters
+  safety_buffer: 5.0      # meters
+
+# Deconfliction Parameters
+deconfliction:
+  time_resolution: 0.1    # seconds
+  lookahead_time: 30.0    # seconds
+  conflict_threshold: 3.0  # meters
+
+# Database Configuration
+database:
+  path: "drones.db"
+  backup_interval: 3600  # seconds
+
+# Visualization
+visualization:
+  update_interval: 1.0    # seconds
+  map_center: [51.505, -0.09]
+  map_zoom: 13

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Visualization - UAV Deconfliction System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo i {
+            font-size: 2.5rem;
+            color: #667eea;
+        }
+        
+        .logo h1 {
+            font-size: 1.8rem;
+            color: #333;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .nav-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 8px;
+            background: white;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-link:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .visualization-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        #map {
+            height: 500px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        #plotly-3d {
+            height: 500px;
+            border-radius: 10px;
+        }
+        
+        .control-panel {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        .time-control {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        
+        .time-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .drone-legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-map"></i>
+                <div>
+                    <h1>Drone Trajectory Visualization</h1>
+                    <p>UAV Deconfliction System</p>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a href="/visualization" class="nav-link active"><i class="fas fa-map"></i> Visualization</a>
+            </div>
+        </header>
+        
+        <div class="visualization-grid">
+            <!-- 2D Map View -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-globe"></i> 2D Map View</h2>
+                    <div class="control-panel">
+                        <button class="btn" onclick="showRealtime()">
+                            <i class="fas fa-play"></i> Real-time
+                        </button>
+                        <button class="btn" onclick="showHistorical()">
+                            <i class="fas fa-history"></i> Historical
+                        </button>
+                        <button class="btn" onclick="clearMap()">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </div>
+                </div>
+                <div id="map"></div>
+                <div class="drone-legend" id="map-legend"></div>
+            </div>
+            
+            <!-- 3D/4D Visualization -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-cube"></i> 3D/4D Visualization</h2>
+                    <div class="control-panel">
+                        <button class="btn" onclick="show3D()">
+                            <i class="fas fa-cube"></i> 3D View
+                        </button>
+                        <button class="btn" onclick="show4D()">
+                            <i class="fas fa-clock"></i> 4D View
+                        </button>
+                        <button class="btn" onclick="animateTrajectories()">
+                            <i class="fas fa-play-circle"></i> Animate
+                        </button>
+                    </div>
+                </div>
+                <div id="plotly-3d"></div>
+                <div class="time-control" id="time-control" style="display: none;">
+                    <label>Time: <span id="time-display">00:00</span></label>
+                    <input type="range" class="time-slider" id="time-slider" min="0" max="100" value="0">
+                </div>
+                <div class="drone-legend" id="3d-legend"></div>
+            </div>
+            
+            <!-- Conflict Visualization -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-exclamation-triangle"></i> Conflict Zones</h2>
+                </div>
+                <div id="conflict-visualization" style="height: 300px; border-radius: 10px; background: #f8f9fa; padding: 15px;">
+                    <p>Conflict zones will appear here when detected</p>
+                    <div id="conflict-list"></div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>UAV Deconfliction System | FlytBase Robotics Assignment 2025</p>
+            <p>Real-time trajectory visualization and conflict detection</p>
+        </footer>
+    </div>
+    
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([51.505, -0.09], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // WebSocket connection
+        const socket = io();
+        
+        // Global variables
+        let droneMarkers = {};
+        let droneTrajectories = {};
+        let conflictZones = [];
+        let currentTime = 0;
+        let isRealtime = true;
+        
+        // Drone colors
+        const droneColors = {
+            1: '#FF5733',
+            2: '#33FF57',
+            3: '#3357FF',
+            4: '#F333FF'
+        };
+        
+        // Initialize WebSocket
+        socket.on('connect', () => {
+            console.log('Connected to visualization server');
+            socket.emit('request_update');
+        });
+        
+        socket.on('drone_update', (data) => {
+            updateMap(data.drones);
+            update3DVisualization(data.drones);
+            updateConflictDisplay(data.conflicts);
+        });
+        
+        socket.on('conflict_alert', (data) => {
+            showConflictAlert(data);
+        });
+        
+        // Update 2D map
+// In visualization.html, update the updateMap function:
+
+        function updateMap(drones) {
+            if (!drones) return;
+            
+            Object.entries(drones).forEach(([droneId, drone]) => {
+                if (!drone || !drone.position) return;
+                
+                const position = drone.position;
+                
+                // Use actual GPS coordinates if available
+                let lat, lon;
+                if (position.lat && position.lon) {
+                    // Convert from degrees to proper format
+                    lat = position.lat;
+                    lon = position.lon;
+                } else {
+                    // Fallback to simulated coordinates
+                    lat = -35.3632621 + (droneId * 0.0001);
+                    lon = 149.1652264 + (droneId * 0.0001);
+                }
+                
+                // Update or create marker
+                if (!droneMarkers[droneId]) {
+                    droneMarkers[droneId] = L.marker([lat, lon], {
+                        icon: L.divIcon({
+                            className: 'drone-icon',
+                            html: `<div style="background: ${droneColors[droneId] || '#000000'}; 
+                                width: 20px; height: 20px; border-radius: 50%; 
+                                border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);
+                                display: flex; align-items: center; justify-content: center;">
+                                <span style="color: white; font-size: 10px; font-weight: bold;">${droneId}</span>
+                                </div>`,
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map);
+                    
+                    // Add popup with detailed information
+                    droneMarkers[droneId].bindPopup(`
+                        <div style="min-width: 200px;">
+                            <strong>Drone ${droneId}</strong><br>
+                            Status: ${drone.status || 'Unknown'}<br>
+                            Mode: ${drone.mode || 'Unknown'}<br>
+                            Armed: ${drone.armed ? 'Yes' : 'No'}<br>
+                            Battery: ${drone.battery || 'N/A'}%<br>
+                            Position:<br>
+                            - Local: ${position.x?.toFixed(2) || 'N/A'}, ${position.y?.toFixed(2) || 'N/A'}, ${position.z?.toFixed(2) || 'N/A'}m<br>
+                            - GPS: ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
+                            - Altitude: ${position.alt?.toFixed(2) || 'N/A'}m
+                        </div>
+                    `);
+                } else {
+                    droneMarkers[droneId].setLatLng([lat, lon]);
+                    
+                    // Update popup content
+                    droneMarkers[droneId].setPopupContent(`
+                        <div style="min-width: 200px;">
+                            <strong>Drone ${droneId}</strong><br>
+                            Status: ${drone.status || 'Unknown'}<br>
+                            Mode: ${drone.mode || 'Unknown'}<br>
+                            Armed: ${drone.armed ? 'Yes' : 'No'}<br>
+                            Battery: ${drone.battery || 'N/A'}%<br>
+                            Position:<br>
+                            - Local: ${position.x?.toFixed(2) || 'N/A'}, ${position.y?.toFixed(2) || 'N/A'}, ${position.z?.toFixed(2) || 'N/A'}m<br>
+                            - GPS: ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
+                            - Altitude: ${position.alt?.toFixed(2) || 'N/A'}m
+                        </div>
+                    `);
+                }
+                
+                // Store trajectory point
+                if (!droneTrajectories[droneId]) {
+                    droneTrajectories[droneId] = [];
+                }
+                
+                droneTrajectories[droneId].push([lat, lon]);
+                
+                // Keep only last 50 points
+                if (droneTrajectories[droneId].length > 50) {
+                    droneTrajectories[droneId].shift();
+                }
+                
+                // Update trajectory line
+                updateTrajectoryLine(droneId);
+            });
+            
+            updateLegend();
+            
+            // Auto-center map if needed
+            if (Object.keys(droneMarkers).length > 0 && isRealtime) {
+                const bounds = L.latLngBounds(Object.values(droneMarkers).map(m => m.getLatLng()));
+                map.fitBounds(bounds.pad(0.1));
+            }
+        }        
+        
+        function updateTrajectoryLine(droneId) {
+            // Remove old line if exists
+            if (droneMarkers[droneId + '_line']) {
+                map.removeLayer(droneMarkers[droneId + '_line']);
+            }
+            
+            // Add new line if we have enough points
+            if (droneTrajectories[droneId] && droneTrajectories[droneId].length > 1) {
+                droneMarkers[droneId + '_line'] = L.polyline(droneTrajectories[droneId], {
+                    color: droneColors[droneId] || '#000000',
+                    weight: 2,
+                    opacity: 0.5
+                }).addTo(map);
+            }
+        }
+        
+        function updateLegend() {
+            const legend = document.getElementById('map-legend');
+            legend.innerHTML = '';
+            
+            Object.entries(droneColors).forEach(([droneId, color]) => {
+                const legendItem = document.createElement('div');
+                legendItem.className = 'legend-item';
+                legendItem.innerHTML = `
+                    <div class="legend-color" style="background: ${color};"></div>
+                    <span>Drone ${droneId}</span>
+                `;
+                legend.appendChild(legendItem);
+            });
+        }
+        
+        // 3D Visualization
+        function update3DVisualization(drones) {
+            const traces = [];
+            const conflictTraces = [];
+            
+            Object.entries(drones).forEach(([droneId, drone]) => {
+                if (!drone || !drone.position) return;
+                
+                const position = drone.position;
+                
+                // Add current position
+                traces.push({
+                    x: [position.x || 0],
+                    y: [position.y || 0],
+                    z: [position.z || 0],
+                    type: 'scatter3d',
+                    mode: 'markers',
+                    marker: {
+                        size: 8,
+                        color: droneColors[droneId] || '#000000'
+                    },
+                    name: `Drone ${droneId}`,
+                    text: [`Drone ${droneId}: (${position.x?.toFixed(1)}, ${position.y?.toFixed(1)}, ${position.z?.toFixed(1)})`],
+                    hoverinfo: 'text'
+                });
+                
+                // Add trajectory line
+                if (droneTrajectories[droneId] && droneTrajectories[droneId].length > 1) {
+                    const lineX = [];
+                    const lineY = [];
+                    const lineZ = [];
+                    
+                    // For simulation, create a simple trajectory
+                    for (let i = 0; i < 10; i++) {
+                        lineX.push((position.x || 0) + Math.sin(i * 0.5) * 2);
+                        lineY.push((position.y || 0) + Math.cos(i * 0.5) * 2);
+                        lineZ.push((position.z || 0) + i * 0.5);
+                    }
+                    
+                    traces.push({
+                        x: lineX,
+                        y: lineY,
+                        z: lineZ,
+                        type: 'scatter3d',
+                        mode: 'lines',
+                        line: {
+                            width: 3,
+                            color: droneColors[droneId] || '#000000'
+                        },
+                        name: `Trajectory ${droneId}`,
+                        showlegend: false
+                    });
+                }
+            });
+            
+            // Add conflict zones if any
+            if (conflictZones.length > 0) {
+                conflictZones.forEach((conflict, index) => {
+                    conflictTraces.push({
+                        x: [conflict.position[0]],
+                        y: [conflict.position[1]],
+                        z: [conflict.position[2]],
+                        type: 'scatter3d',
+                        mode: 'markers',
+                        marker: {
+                            size: 12,
+                            color: '#FF0000',
+                            symbol: 'diamond'
+                        },
+                        name: `Conflict ${index + 1}`,
+                        text: [`Conflict: Drones ${conflict.drone1} & ${conflict.drone2}, Distance: ${conflict.distance.toFixed(2)}m`],
+                        hoverinfo: 'text'
+                    });
+                });
+            }
+            
+            // Combine traces
+            const allTraces = [...traces, ...conflictTraces];
+            
+            // Update plot
+            Plotly.newPlot('plotly-3d', allTraces, {
+                title: '3D Drone Positions',
+                scene: {
+                    xaxis: { title: 'X (m)', range: [-50, 50] },
+                    yaxis: { title: 'Y (m)', range: [-50, 50] },
+                    zaxis: { title: 'Altitude (m)', range: [0, 100] },
+                    camera: {
+                        eye: { x: 1.5, y: 1.5, z: 1.5 }
+                    }
+                },
+                margin: { l: 0, r: 0, b: 0, t: 30 }
+            });
+        }
+        
+        // Update conflict display
+        function updateConflictDisplay(conflicts) {
+            const conflictList = document.getElementById('conflict-list');
+            
+            if (!conflicts || conflicts.length === 0) {
+                conflictList.innerHTML = '<p style="color: #4CAF50;">No active conflicts detected</p>';
+                return;
+            }
+            
+            let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+            conflicts.forEach((conflict, index) => {
+                html += `
+                    <div style="background: #FFEBEE; padding: 10px; border-radius: 5px; border-left: 4px solid #F44336;">
+                        <strong>Conflict ${index + 1}</strong><br>
+                        Drones: ${conflict.drone1} & ${conflict.drone2}<br>
+                        Distance: ${conflict.distance?.toFixed(2) || 'N/A'}m<br>
+                        Time: ${conflict.time || 'N/A'}
+                    </div>
+                `;
+                
+                // Add to conflict zones for visualization
+                if (conflict.position) {
+                    conflictZones.push({
+                        drone1: conflict.drone1,
+                        drone2: conflict.drone2,
+                        distance: conflict.distance,
+                        position: conflict.position
+                    });
+                }
+            });
+            html += '</div>';
+            
+            conflictList.innerHTML = html;
+        }
+        
+        // Show conflict alert
+        function showConflictAlert(data) {
+            // Add to conflict zones
+            conflictZones.push({
+                drone1: data.drone1,
+                drone2: data.drone2,
+                distance: data.distance,
+                position: data.position || [0, 0, 0],
+                timestamp: data.timestamp
+            });
+            
+            // Keep only last 10 conflicts
+            if (conflictZones.length > 10) {
+                conflictZones.shift();
+            }
+            
+            // Update displays
+            updateConflictDisplay(conflictZones);
+            update3DVisualization({});
+            
+            // Show notification
+            alert(`CONFLICT ALERT!\nDrones ${data.drone1} and ${data.drone2} are too close!\nDistance: ${data.distance?.toFixed(2) || 'N/A'}m`);
+        }
+        
+        // Control functions
+        function showRealtime() {
+            isRealtime = true;
+            document.getElementById('time-control').style.display = 'none';
+            socket.emit('request_update');
+        }
+        
+        function showHistorical() {
+            isRealtime = false;
+            document.getElementById('time-control').style.display = 'block';
+            // In a real system, this would fetch historical data
+        }
+        
+        function clearMap() {
+            // Clear all markers and trajectories
+            Object.values(droneMarkers).forEach(marker => {
+                if (marker && marker.remove) {
+                    marker.remove();
+                }
+            });
+            
+            droneMarkers = {};
+            droneTrajectories = {};
+            conflictZones = [];
+            
+            // Clear 3D plot
+            Plotly.purge('plotly-3d');
+            
+            // Clear conflict list
+            document.getElementById('conflict-list').innerHTML = '<p>No conflicts detected</p>';
+        }
+        
+        function show3D() {
+            // Already showing 3D
+            socket.emit('request_update');
+        }
+        
+        function show4D() {
+            // 4D visualization with time as color
+            alert('4D visualization would show time as color gradient. Implementation pending historical data.');
+        }
+        
+        function animateTrajectories() {
+            alert('Animation feature would play back trajectory history. Implementation pending historical data.');
+        }
+        
+        // Time slider for historical view
+        document.getElementById('time-slider').addEventListener('input', function(e) {
+            currentTime = e.target.value;
+            document.getElementById('time-display').textContent = formatTime(currentTime);
+            // In a real system, this would update the visualization for that time
+        });
+        
+        function formatTime(value) {
+            const minutes = Math.floor(value / 60);
+            const seconds = value % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Initialize
+        window.onload = function() {
+            updateLegend();
+            socket.emit('request_update');
+        };
+    </script>
+</body>
+</html>

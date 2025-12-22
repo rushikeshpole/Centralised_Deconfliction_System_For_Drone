@@ -1,0 +1,13 @@
+# Python bytecode (already causing clutter in your log)
+__pycache__/
+*.pyc
+
+# Drone logs and large data files
+*.log
+logs/
+*.csv
+*.db
+*.tmp
+
+# System files
+.DS_Store

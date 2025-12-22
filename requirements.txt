@@ -1,0 +1,13 @@
+Flask==2.3.3
+Flask-SocketIO==5.3.4
+Flask-CORS==4.0.0
+plotly==5.17.0
+pandas==2.1.1
+numpy==1.24.3
+scipy==1.11.2
+pymavlink==2.4.37
+dronekit==2.9.2
+pyyaml==6.0.1
+eventlet==0.33.3
+geographiclib==2.0
+python-socketio==5.9.0
