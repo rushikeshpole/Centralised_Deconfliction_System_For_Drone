@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,53 +13,53 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #333;
             min-height: 100vh;
         }
-        
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
-        
+
         header {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .logo {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-        
+
         .logo i {
             font-size: 2.5rem;
             color: #667eea;
         }
-        
+
         .logo h1 {
             font-size: 1.8rem;
             color: #333;
         }
-        
+
         .system-status {
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        
+
         .status-indicator {
             width: 12px;
             height: 12px;
@@ -66,32 +67,40 @@
             background: #4CAF50;
             animation: pulse 2s infinite;
         }
-        
+
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
-        
+
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 25px;
             margin-bottom: 25px;
         }
-        
+
         .card {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 15px;
             padding: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease;
         }
-        
+
         .card:hover {
             transform: translateY(-5px);
         }
-        
+
         .card-header {
             display: flex;
             justify-content: space-between;
@@ -100,13 +109,13 @@
             padding-bottom: 15px;
             border-bottom: 2px solid #f0f0f0;
         }
-        
+
         .card-title {
             font-size: 1.3rem;
             font-weight: 600;
             color: #333;
         }
-        
+
         .drone-card {
             background: #f8f9fa;
             border-radius: 10px;
@@ -114,42 +123,42 @@
             margin-bottom: 15px;
             border-left: 4px solid #667eea;
         }
-        
+
         .drone-card.status-active {
             border-left-color: #4CAF50;
         }
-        
+
         .drone-card.status-busy {
             border-left-color: #FF9800;
         }
-        
+
         .drone-card.status-error {
             border-left-color: #F44336;
         }
-        
+
         .drone-info {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 10px;
             margin-top: 10px;
         }
-        
+
         .info-item {
             font-size: 0.9rem;
         }
-        
+
         .info-label {
             font-weight: 600;
             color: #666;
         }
-        
+
         .control-buttons {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
             margin-top: 15px;
         }
-        
+
         .btn {
             padding: 8px 16px;
             border: none;
@@ -161,44 +170,46 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .btn-primary {
             background: #667eea;
             color: white;
         }
-        
+
         .btn-success {
             background: #4CAF50;
             color: white;
         }
-        
+
         .btn-warning {
             background: #FF9800;
             color: white;
         }
-        
+
         .btn-danger {
             background: #F44336;
             color: white;
         }
-        
+
         .btn:hover {
             opacity: 0.9;
             transform: translateY(-2px);
         }
-        
+
         .form-group {
             margin-bottom: 20px;
         }
-        
+
         .form-label {
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
             color: #333;
         }
-        
-        .form-input, .form-select, .form-textarea {
+
+        .form-input,
+        .form-select,
+        .form-textarea {
             width: 100%;
             padding: 12px;
             border: 2px solid #e0e0e0;
@@ -206,58 +217,60 @@
             font-size: 1rem;
             transition: border-color 0.3s ease;
         }
-        
-        .form-input:focus, .form-select:focus, .form-textarea:focus {
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
             outline: none;
             border-color: #667eea;
         }
-        
+
         .form-textarea {
             height: 100px;
             resize: vertical;
             font-family: monospace;
         }
-        
+
         .mission-result {
             margin-top: 20px;
             padding: 15px;
             border-radius: 8px;
             display: none;
         }
-        
+
         .result-success {
             background: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
-        
+
         .result-error {
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-        
+
         .result-conflict {
             background: #fff3cd;
             color: #856404;
             border: 1px solid #ffeaa7;
         }
-        
+
         .conflict-details {
             margin-top: 10px;
             padding: 10px;
-            background: rgba(255,255,255,0.5);
+            background: rgba(255, 255, 255, 0.5);
             border-radius: 5px;
         }
-        
+
         .suggestion-item {
             padding: 8px;
             margin: 5px 0;
-            background: rgba(255,255,255,0.8);
+            background: rgba(255, 255, 255, 0.8);
             border-radius: 5px;
             border-left: 3px solid #4CAF50;
         }
-        
+
         footer {
             text-align: center;
             padding: 20px;
@@ -265,13 +278,13 @@
             font-size: 0.9rem;
             opacity: 0.9;
         }
-        
+
         .nav-links {
             display: flex;
             gap: 20px;
             margin-top: 20px;
         }
-        
+
         .nav-link {
             color: #667eea;
             text-decoration: none;
@@ -281,17 +294,17 @@
             background: white;
             transition: all 0.3s ease;
         }
-        
+
         .nav-link:hover {
             background: #667eea;
             color: white;
         }
-        
+
         @media (max-width: 768px) {
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             header {
                 flex-direction: column;
                 gap: 20px;
@@ -300,6 +313,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -315,13 +329,13 @@
                 <span id="connection-status">Connected</span>
             </div>
         </header>
-        
+
         <div class="nav-links">
             <a href="/" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
             <a href="/visualization" class="nav-link"><i class="fas fa-map"></i> Visualization</a>
             <a href="/history/1" class="nav-link"><i class="fas fa-history"></i> History</a>
         </div>
-        
+
         <div class="dashboard-grid">
             <!-- Drone Status Card -->
             <div class="card">
@@ -334,15 +348,12 @@
                     <div class="loading">Loading drone status...</div>
                 </div>
                 <div class="control-buttons">
-                    <button class="btn btn-primary" onclick="refreshStatus()">
-                        <i class="fas fa-sync-alt"></i> Refresh
-                    </button>
                     <button class="btn btn-danger" onclick="emergencyStop()">
                         <i class="fas fa-exclamation-triangle"></i> Emergency Stop
                     </button>
                 </div>
             </div>
-            
+
             <!-- Mission Scheduler Card -->
             <div class="card">
                 <div class="card-header">
@@ -358,7 +369,7 @@
                             <option value="4">Drone 4</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">Waypoints (JSON format)</label>
                         <textarea class="form-textarea" id="waypoints" required>
@@ -370,31 +381,31 @@
                         </textarea>
                         <small>Format: [[x1,y1,z1], [x2,y2,z2], ...]</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">Start Time</label>
                         <input type="datetime-local" class="form-input" id="start-time" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label class="form-label">End Time</label>
                         <input type="datetime-local" class="form-input" id="end-time" required>
                     </div>
-                    
+
                     <button type="submit" class="btn btn-success" style="width: 100%;">
                         <i class="fas fa-paper-plane"></i> Schedule Mission
                     </button>
                 </form>
-                
+
                 <div id="mission-result" class="mission-result"></div>
             </div>
-            
+
             <!-- Quick Controls Card -->
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title"><i class="fas fa-gamepad"></i> Quick Controls</h2>
                 </div>
-                
+
                 <div class="form-group">
                     <label class="form-label">Select Drone</label>
                     <select class="form-select" id="control-drone-select">
@@ -404,7 +415,7 @@
                         <option value="4">Drone 4</option>
                     </select>
                 </div>
-                
+
                 <div class="control-buttons">
                     <button class="btn btn-success" onclick="controlDrone('arm')">
                         <i class="fas fa-power-off"></i> Arm
@@ -422,7 +433,7 @@
                         <i class="fas fa-power-off"></i> Disarm
                     </button>
                 </div>
-                
+
                 <div class="form-group" style="margin-top: 20px;">
                     <label class="form-label">Go To Position</label>
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
@@ -430,12 +441,13 @@
                         <input type="number" class="form-input" id="goto-y" placeholder="Y" value="10">
                         <input type="number" class="form-input" id="goto-z" placeholder="Z" value="15">
                     </div>
-                    <button class="btn btn-primary" onclick="controlDrone('goto')" style="width: 100%; margin-top: 10px;">
+                    <button class="btn btn-primary" onclick="controlDrone('goto')"
+                        style="width: 100%; margin-top: 10px;">
                         <i class="fas fa-plane"></i> Go To Position
                     </button>
                 </div>
             </div>
-            
+
             <!-- Active Missions Card -->
             <div class="card">
                 <div class="card-header">
@@ -446,75 +458,86 @@
                 </div>
             </div>
         </div>
-        
+
         <footer>
             <p>UAV Deconfliction System | FlytBase Robotics Assignment 2025</p>
             <p>Real-time conflict detection and mission scheduling</p>
         </footer>
     </div>
-    
+
     <script>
         // WebSocket connection
         const socket = io();
-        
+
         // DOM Elements
         const dronesContainer = document.getElementById('drones-container');
         const missionsContainer = document.getElementById('missions-container');
         const missionResult = document.getElementById('mission-result');
         const lastUpdateSpan = document.getElementById('last-update');
         const connectionStatus = document.getElementById('connection-status');
-        
+
         // WebSocket event handlers
         socket.on('connect', () => {
             console.log('Connected to server');
             connectionStatus.textContent = 'Connected';
             connectionStatus.style.color = '#4CAF50';
         });
-        
+
         socket.on('disconnect', () => {
             console.log('Disconnected from server');
             connectionStatus.textContent = 'Disconnected';
             connectionStatus.style.color = '#F44336';
         });
-        
+
         socket.on('drone_update', (data) => {
             updateDronesDisplay(data.drones);
             lastUpdateSpan.textContent = 'Just now';
         });
-        
+
         socket.on('conflict_alert', (data) => {
             showConflictAlert(data);
         });
-        
+
         // Initialize datetime inputs with future times
         function initDateTimeInputs() {
             const now = new Date();
-            const startTime = new Date(now.getTime() + 5 * 60000); // 5 minutes from now
-            const endTime = new Date(startTime.getTime() + 10 * 60000); // 10 minutes later
-            
-            document.getElementById('start-time').value = formatDateTime(startTime);
-            document.getElementById('end-time').value = formatDateTime(endTime);
+
+            const startTime = new Date(now.getTime() + 20 * 60000); // +20 minutes
+            const endTime = new Date(startTime.getTime() + 20 * 60000); // +20 more minutes
+
+            document.getElementById('start-time').value = formatDateTimeLocal(startTime);
+            document.getElementById('end-time').value = formatDateTimeLocal(endTime);
         }
-        
-        function formatDateTime(date) {
-            return date.toISOString().slice(0, 16);
+
+
+        function formatDateTimeLocal(date) {
+            const pad = n => n.toString().padStart(2, '0');
+
+            return (
+                date.getFullYear() + '-' +
+                pad(date.getMonth() + 1) + '-' +
+                pad(date.getDate()) + 'T' +
+                pad(date.getHours()) + ':' +
+                pad(date.getMinutes())
+            );
         }
-        
+
+
         // Update drones display
         function updateDronesDisplay(drones) {
             dronesContainer.innerHTML = '';
-            
+
             if (!drones || Object.keys(drones).length === 0) {
                 dronesContainer.innerHTML = '<div class="drone-card status-error">No drones connected</div>';
                 return;
             }
-            
+
             for (const [droneId, drone] of Object.entries(drones)) {
                 if (!drone) continue;
-                
+
                 const position = drone.position || {};
                 const statusClass = drone.armed ? 'status-active' : 'status-busy';
-                
+
                 const droneCard = document.createElement('div');
                 droneCard.className = `drone-card ${statusClass}`;
                 droneCard.innerHTML = `
@@ -550,99 +573,104 @@
                         </div>
                     </div>
                 `;
-                
+
                 dronesContainer.appendChild(droneCard);
             }
         }
-        
+
         // Mission form submission
-        document.getElementById('mission-form').onsubmit = async function(e) {
+        document.getElementById('mission-form').onsubmit = async function (e) {
             e.preventDefault();
-            
             const droneId = document.getElementById('drone-select').value;
-            const waypointsInput = document.getElementById('waypoints').value;
-            const startTime = document.getElementById('start-time').value;
-            const endTime = document.getElementById('end-time').value;
-            
-            // Parse waypoints
-            let waypoints;
-            try {
-                waypoints = JSON.parse(waypointsInput);
-                if (!Array.isArray(waypoints)) {
-                    throw new Error('Waypoints must be an array');
-                }
-            } catch (error) {
-                showResult('error', 'Invalid waypoints format: ' + error.message);
-                return;
-            }
-            
-            // Prepare mission data
+            const waypoints = JSON.parse(document.getElementById('waypoints').value);
+            const startTime = document.getElementById('start-time').value + ':00Z';
+            const endTime = document.getElementById('end-time').value + ':00Z';
+
             const missionData = {
                 drone_id: parseInt(droneId),
                 waypoints: waypoints,
-                start_time: startTime + ':00Z',
-                end_time: endTime + ':00Z'
+                start_time: startTime,
+                end_time: endTime
             };
-            
-            // Send to server
+
             try {
                 const response = await fetch('/api/schedule', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(missionData)
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
-                    showResult('success', `Mission scheduled successfully! Mission ID: ${result.mission_id}`);
-                    loadMissions(); // Refresh missions list
+                    showSuccessMessage(`Mission ${result.mission_id} scheduled!`);
+                    loadMissions();
                 } else if (result.conflict) {
-                    showConflictResult(result);
+                    showConflictDetails(result);
                 } else {
-                    showResult('error', `Failed to schedule mission: ${result.error}`);
+                    showErrorMessage(result.error);
                 }
             } catch (error) {
-                showResult('error', 'Network error: ' + error.message);
+                showErrorMessage('Network error: ' + error.message);
             }
-        };
-        
+        }
+
+        function showConflictDetails(result) {
+            const conflictDiv = document.getElementById('mission-result');
+            conflictDiv.className = 'mission-result result-conflict';
+
+            let html = `<strong>🚫 MISSION CONFLICT DETECTED!</strong><br>`;
+            html += `<p>${result.message}</p>`;
+
+            if (result.conflicts && result.conflicts.length > 0) {
+                html += `<div class="conflict-details">`;
+                html += `<h4>Conflict Details:</h4>`;
+
+                result.conflicts.forEach((conflict, index) => {
+                    html += `<div class="conflict-item">`;
+                    html += `<strong>Conflict ${index + 1}:</strong><br>`;
+                    html += `Time: ${conflict.time}<br>`;
+                    html += `Position: [${conflict.position[0].toFixed(1)}, ${conflict.position[1].toFixed(1)}, ${conflict.position[2].toFixed(1)}]<br>`;
+                    html += `With: Drone ${conflict.conflicting_drone}<br>`;
+                    html += `Distance: ${conflict.distance.toFixed(2)}m`;
+                    html += `</div>`;
+                });
+
+                html += `</div>`;
+            }
+
+            if (result.suggestions && result.suggestions.length > 0) {
+                html += `<div class="suggestions">`;
+                html += `<h4>Suggested Resolutions:</h4>`;
+
+                result.suggestions.forEach((suggestion, index) => {
+                    html += `<div class="suggestion-item">`;
+                    html += `<strong>${suggestion.type.toUpperCase()}:</strong> ${suggestion.description}`;
+
+                    if (suggestion.type === 'time_shift' && suggestion.new_start) {
+                        html += `<br><small>New start time: ${suggestion.new_start}</small>`;
+                    }
+
+                    html += `</div>`;
+                });
+
+                html += `</div>`;
+            }
+
+            conflictDiv.innerHTML = html;
+            conflictDiv.style.display = 'block';
+            conflictDiv.scrollIntoView({ behavior: 'smooth' });
+        }
         // Show result message
         function showResult(type, message) {
             missionResult.className = `mission-result result-${type}`;
             missionResult.innerHTML = `<strong>${type.toUpperCase()}:</strong> ${message}`;
             missionResult.style.display = 'block';
-            
+
             // Scroll to result
             missionResult.scrollIntoView({ behavior: 'smooth' });
         }
-        
-        // Show conflict result with suggestions
-        function showConflictResult(result) {
-            missionResult.className = 'mission-result result-conflict';
-            
-            let html = `<strong>CONFLICT DETECTED!</strong><br>`;
-            html += `Mission conflicts with ${result.details.conflict_count} existing trajectories.<br>`;
-            html += `Minimum distance: ${result.details.min_distance.toFixed(2)}m (required: ${result.details.safety_buffer}m)<br><br>`;
-            
-            if (result.details.suggestions && result.details.suggestions.length > 0) {
-                html += `<strong>Suggestions:</strong><div class="conflict-details">`;
-                result.details.suggestions.forEach(suggestion => {
-                    html += `<div class="suggestion-item">`;
-                    html += `<strong>${suggestion.type.replace('_', ' ').toUpperCase()}:</strong> `;
-                    html += `${suggestion.description}`;
-                    html += `</div>`;
-                });
-                html += `</div>`;
-            }
-            
-            missionResult.innerHTML = html;
-            missionResult.style.display = 'block';
-            missionResult.scrollIntoView({ behavior: 'smooth' });
-        }
-        
+
         // Show real-time conflict alert
         function showConflictAlert(data) {
             const alertDiv = document.createElement('div');
@@ -653,9 +681,9 @@
                 Time: ${new Date(data.timestamp).toLocaleTimeString()}
             `;
             alertDiv.style.animation = 'pulse 0.5s 3';
-            
+
             dronesContainer.insertBefore(alertDiv, dronesContainer.firstChild);
-            
+
             // Remove after 10 seconds
             setTimeout(() => {
                 if (alertDiv.parentNode) {
@@ -663,13 +691,13 @@
                 }
             }, 10000);
         }
-        
+
         // Control drone functions
         async function controlDrone(action) {
             const droneId = document.getElementById('control-drone-select').value;
-            
+
             let data = { command: action };
-            
+
             if (action === 'takeoff') {
                 data.altitude = 10.0;
             } else if (action === 'goto') {
@@ -677,7 +705,7 @@
                 data.y = parseFloat(document.getElementById('goto-y').value);
                 data.z = parseFloat(document.getElementById('goto-z').value);
             }
-            
+
             try {
                 const response = await fetch(`/api/control/${droneId}`, {
                     method: 'POST',
@@ -686,9 +714,9 @@
                     },
                     body: JSON.stringify(data)
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     showResult('success', `Drone ${droneId}: ${result.message}`);
                     setTimeout(refreshStatus, 1000);
@@ -699,20 +727,20 @@
                 showResult('error', 'Network error: ' + error.message);
             }
         }
-        
+
         // Emergency stop all drones
         async function emergencyStop() {
             if (!confirm('WARNING: This will immediately land all drones. Are you sure?')) {
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/emergency', {
                     method: 'POST'
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     showResult('success', 'Emergency stop initiated! All drones landing.');
                     setTimeout(refreshStatus, 2000);
@@ -723,13 +751,13 @@
                 showResult('error', 'Network error: ' + error.message);
             }
         }
-        
+
         // Refresh drone status
         async function refreshStatus() {
             try {
                 const response = await fetch('/api/drones');
                 const result = await response.json();
-                
+
                 if (result.success) {
                     updateDronesDisplay(result.drones);
                     lastUpdateSpan.textContent = 'Just now';
@@ -738,13 +766,13 @@
                 console.error('Error refreshing status:', error);
             }
         }
-        
+
         // Load active missions
         async function loadMissions() {
             try {
                 const response = await fetch('/api/missions');
                 const result = await response.json();
-                
+
                 if (result.success) {
                     displayMissions(result.missions);
                 }
@@ -752,16 +780,16 @@
                 console.error('Error loading missions:', error);
             }
         }
-        
+
         // Display missions
         function displayMissions(missions) {
             missionsContainer.innerHTML = '';
-            
+
             if (!missions || missions.length === 0) {
                 missionsContainer.innerHTML = '<div class="drone-card">No active missions</div>';
                 return;
             }
-            
+
             missions.forEach(mission => {
                 const missionCard = document.createElement('div');
                 missionCard.className = 'drone-card';
@@ -780,13 +808,13 @@
                         ${mission.conflict_detected ? '<div style="color: #F44336;"><strong>⚠ Conflict Detected</strong></div>' : ''}
                     </div>
                 `;
-                
+
                 missionsContainer.appendChild(missionCard);
             });
         }
-        
+
         function getStatusColor(status) {
-            switch(status.toLowerCase()) {
+            switch (status.toLowerCase()) {
                 case 'scheduled': return '#2196F3';
                 case 'executing': return '#FF9800';
                 case 'active': return '#4CAF50';
@@ -795,17 +823,17 @@
                 default: return '#757575';
             }
         }
-        
+
         // Initialize page
-        window.onload = function() {
+        window.onload = function () {
             initDateTimeInputs();
             refreshStatus();
             loadMissions();
-            
             // Request initial update via WebSocket
             socket.emit('request_update');
         };
+
     </script>
 </body>
-</html>
 
+</html>

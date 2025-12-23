@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 """
-Mission execution and scheduling system
+Simplified Mission Executor using local/system time
 """
 import threading
 import time
@@ -22,17 +23,15 @@ class MissionExecutor:
     def schedule_mission(self, drone_id: int, waypoints: List[List[float]],
                         start_time: datetime, end_time: datetime) -> Optional[int]:
         """
-        Schedule a new mission for a drone
-        
-        Returns:
-            Mission ID if scheduled successfully, None otherwise
+        Schedule a new mission for a drone - USING LOCAL TIME
         """
         try:
             # Create mission in database
             mission_id = create_mission(drone_id, waypoints, start_time, end_time)
             
             # Calculate wait time until mission start
-            current_time = datetime.now()
+            current_time = datetime.now()  # ← Local time
+            
             if start_time > current_time:
                 wait_seconds = (start_time - current_time).total_seconds()
                 
@@ -48,6 +47,7 @@ class MissionExecutor:
                 
                 logger.info(f"Scheduled mission {mission_id} for drone {drone_id}, "
                           f"starting in {wait_seconds:.1f} seconds")
+                logger.info(f"Local start time: {start_time}, Current: {current_time}")
             else:
                 # Start immediately
                 self._execute_mission(mission_id, drone_id, waypoints, start_time, end_time)
@@ -56,6 +56,8 @@ class MissionExecutor:
             
         except Exception as e:
             logger.error(f"Failed to schedule mission: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _execute_mission_delayed(self, mission_id: int, drone_id: int,
@@ -69,7 +71,7 @@ class MissionExecutor:
     def _execute_mission(self, mission_id: int, drone_id: int,
                         waypoints: List[List[float]], start_time: datetime,
                         end_time: datetime):
-        """Execute a mission"""
+        """Execute a mission - USING LOCAL TIME"""
         try:
             logger.info(f"Mission {mission_id}: Starting execution for drone {drone_id}")
             update_mission_status(mission_id, 'executing')
@@ -80,18 +82,21 @@ class MissionExecutor:
             if mission_duration <= 0:
                 logger.error(f"Mission {mission_id}: Invalid duration")
                 update_mission_status(mission_id, 'failed')
+                self._safe_land(drone_id)
                 return
             
             # Arm and takeoff
             if not self.drone_controller.arm_drone(drone_id):
                 logger.error(f"Mission {mission_id}: Failed to arm drone")
                 update_mission_status(mission_id, 'failed')
+                self._safe_land(drone_id)
                 return
             
             takeoff_altitude = 5.0
             if not self.drone_controller.takeoff(drone_id, takeoff_altitude):
                 logger.error(f"Mission {mission_id}: Failed to takeoff")
                 update_mission_status(mission_id, 'failed')
+                self._safe_land(drone_id)
                 return
             
             # Execute waypoints
@@ -113,15 +118,20 @@ class MissionExecutor:
                 self._complete_mission(mission_id, drone_id)
                 return
             
-            # Calculate time per segment
+            # Get current local time
             current_time = datetime.now()
+            
+            # Calculate elapsed time (mission already started)
             elapsed = (current_time - start_time).total_seconds()
             remaining_time = mission_duration - elapsed
             
             if remaining_time <= 0:
                 logger.error(f"Mission {mission_id}: No time remaining")
-                self._complete_mission(mission_id, drone_id)
+                self._complete_mission(mission_id, drone_id, failed=True)
                 return
+            
+            logger.info(f"Mission {mission_id}: Mission duration: {mission_duration:.1f}s, "
+                       f"Elapsed: {elapsed:.1f}s, Remaining: {remaining_time:.1f}s")
             
             # Execute each segment
             for i, (waypoint, segment_distance) in enumerate(zip(waypoints, segment_distances[1:])):
@@ -140,11 +150,12 @@ class MissionExecutor:
                     return
                 
                 # Wait for segment completion
-                time_to_wait = min(segment_time, remaining_time)
-                if time_to_wait > 0:
-                    time.sleep(time_to_wait)
+                if segment_time > 0:
+                    actual_wait = min(segment_time, 30)  # Max 30 seconds per segment
+                    logger.info(f"Mission {mission_id}: Waiting {actual_wait:.1f} seconds")
+                    time.sleep(actual_wait)
                 
-                remaining_time -= time_to_wait
+                remaining_time -= segment_time
                 
                 # Check for emergency stop
                 if self._check_emergency_stop(mission_id):
@@ -157,6 +168,8 @@ class MissionExecutor:
             
         except Exception as e:
             logger.error(f"Mission {mission_id}: Execution error: {e}")
+            import traceback
+            traceback.print_exc()
             update_mission_status(mission_id, 'failed')
             self._safe_land(drone_id)
     
@@ -185,6 +198,10 @@ class MissionExecutor:
         self.drone_controller.disarm_drone(drone_id)
         
         logger.info(f"Mission {mission_id}: {status}")
+        
+        # Clean up
+        if mission_id in self.active_missions:
+            del self.active_missions[mission_id]
     
     def _safe_land(self, drone_id: int):
         """Safely land a drone"""
@@ -197,17 +214,4 @@ class MissionExecutor:
     
     def _check_emergency_stop(self, mission_id: int) -> bool:
         """Check if emergency stop is requested"""
-        # In a real system, this would check for user commands or critical conflicts
         return False
-    
-    def cancel_mission(self, mission_id: int):
-        """Cancel an active mission"""
-        if mission_id in self.active_missions:
-            # Signal thread to stop (in real system, use proper threading controls)
-            logger.info(f"Cancelling mission {mission_id}")
-            update_mission_status(mission_id, 'cancelled')
-    
-    def get_mission_status(self, mission_id: int) -> Optional[Dict]:
-        """Get status of a mission"""
-        # This would query the database
-        return None

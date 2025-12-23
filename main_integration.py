@@ -6,8 +6,10 @@ import sys
 import os
 import signal
 import time
+from datetime import datetime, timezone
 from app import app, socketio, init_system, start_update_thread, system_running
-
+import pytz
+utc = pytz.UTC
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
     print("\nShutting down UAV Deconfliction System...")
@@ -25,16 +27,6 @@ def main():
     
     # Set up signal handler for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
-    
-    # Check if required modules are available
-    try:
-        import flask
-        import pymavlink
-        import numpy
-    except ImportError as e:
-        print(f"Error: Missing dependency - {e}")
-        print("Please install requirements: pip install -r requirements.txt")
-        sys.exit(1)
     
     # Initialize system
     try:
@@ -75,6 +67,8 @@ def main():
         print("\nShutdown complete.")
     except Exception as e:
         print(f"Error running server: {e}")
+        import traceback
+        traceback.print_exc()        
         sys.exit(1)
 
 if __name__ == "__main__":

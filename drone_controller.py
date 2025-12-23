@@ -49,7 +49,7 @@ class EnhancedDroneController:
         }
         
         # Safety buffer (meters)
-        self.safety_buffer = 5.0
+        self.safety_buffer = 2.0
 
         self.connect_all()
         
@@ -76,6 +76,11 @@ class EnhancedDroneController:
                 }
                 
                 # Initialize in database
+                from database import add_drone
+
+                add_drone(
+                    drone_id,0.0,0.0,0.0
+                )           
                 update_drone_status(drone_id, status='connected')
                 logger.info(f"✓ Drone {drone_id} connected")
                 
@@ -92,78 +97,66 @@ class EnhancedDroneController:
                     'velocity': None,
                     'battery': 0.0
                 }
-    
-    # In drone_controller.py, update the get_drone_status method:
 
     def get_drone_status(self, drone_id):
-        """Get current status of a drone - Fixed for JSON serialization"""
+        """Get current status of a drone"""
         if drone_id not in self.drones or not self.drones[drone_id]['master']:
-            # Return default status for disconnected drone
-            return {
-                'armed': False,
-                'mode': 'DISCONNECTED',
-                'position': {'x': 0, 'y': 0, 'z': 0, 'lat': 0, 'lon': 0},
-                'battery': 0.0
-            }
+            # Try to reconnect
+            self._reconnect_drone(drone_id)
+            return None
         
         master = self.drones[drone_id]['master']
         
         try:
-            status_data = {
+            # Get heartbeat for mode and armed status
+            msg = master.recv_match(type='HEARTBEAT', blocking=True, timeout=1.0)
+            if msg:
+                self.drones[drone_id]['armed'] = (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
+                
+                # Find mode name
+                mode_id = msg.custom_mode
+                mode_name = 'UNKNOWN'
+                for name, id_val in self.flight_modes.items():
+                    if id_val == mode_id:
+                        mode_name = name
+                        break
+                self.drones[drone_id]['mode'] = mode_name
+            
+            # Get position with better timeout
+            pos_msg = None
+            for _ in range(5):  # Try multiple times
+                pos_msg = master.recv_match(type='GLOBAL_POSITION_INT', blocking=True, timeout=0.5)
+                if pos_msg:
+                    break
+            
+            if pos_msg:
+                lat = pos_msg.lat / 1e7 if pos_msg.lat != 0 else 0
+                lon = pos_msg.lon / 1e7 if pos_msg.lon != 0 else 0
+                alt = pos_msg.relative_alt / 1000.0 if pos_msg.relative_alt != 0 else 0
+                
+                # Only update if we have valid data
+                if lat != 0 and lon != 0:
+                    # Convert to local coordinates
+                    x, y = self.latlon_to_local(lat, lon)
+                    
+                    self.drones[drone_id]['position'] = {
+                        'lat': lat, 'lon': lon, 'alt': alt,
+                        'x': x, 'y': y, 'z': alt
+                    }
+            
+            # Get battery status
+            batt_msg = master.recv_match(type='SYS_STATUS', blocking=False, timeout=0.1)
+            if batt_msg:
+                if hasattr(batt_msg, 'battery_remaining'):
+                    self.drones[drone_id]['battery'] = batt_msg.battery_remaining
+            
+            # Return current status
+            return {
                 'armed': self.drones[drone_id]['armed'],
                 'mode': self.drones[drone_id]['mode'],
                 'position': self.drones[drone_id]['position'] or {'x': 0, 'y': 0, 'z': 0, 'lat': 0, 'lon': 0},
                 'battery': self.drones[drone_id]['battery']
             }
-            
-            # Try to get fresh data if possible
-            msg = master.recv_match(type='HEARTBEAT', blocking=False, timeout=0.1)
-            if msg:
-                status_data['armed'] = (msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
-                
-                # Find mode name
-                mode_id = msg.custom_mode
-                for name, id_val in self.flight_modes.items():
-                    if id_val == mode_id:
-                        status_data['mode'] = name
-                        break
-            
-            # Get position
-            pos_msg = master.recv_match(type='GLOBAL_POSITION_INT', blocking=False, timeout=0.1)
-            if pos_msg:
-                lat = pos_msg.lat / 1e7 if pos_msg.lat != 0 else 0
-                lon = pos_msg.lon / 1e7 if pos_msg.lon != 0 else 0
-                alt = pos_msg.relative_alt / 1000.0
-                
-                # Convert to local coordinates
-                x, y = self.latlon_to_local(lat, lon)
-                
-                status_data['position'] = {
-                    'lat': lat, 'lon': lon, 'alt': alt,
-                    'x': x, 'y': y, 'z': alt
-                }
-            
-            # Get battery
-            batt_msg = master.recv_match(type='SYS_STATUS', blocking=False, timeout=0.1)
-            if batt_msg:
-                if hasattr(batt_msg, 'battery_remaining'):
-                    status_data['battery'] = batt_msg.battery_remaining
-            
-            # Update local state
-            self.drones[drone_id].update(status_data)
-            
-            # Update database
-            from database import update_drone_status
-            update_drone_status(
-                drone_id,
-                status='active' if status_data['armed'] else 'idle',
-                armed=status_data['armed'],
-                mode=status_data['mode'],
-                position=status_data['position'],
-                battery=status_data['battery']
-            )
-            
-            return status_data
             
         except Exception as e:
             logger.error(f"Error getting status for drone {drone_id}: {e}")
@@ -171,9 +164,35 @@ class EnhancedDroneController:
             return {
                 'armed': self.drones[drone_id].get('armed', False),
                 'mode': self.drones[drone_id].get('mode', 'ERROR'),
-                'position': self.drones[drone_id].get('position', {'x': 0, 'y': 0, 'z': 0}),
+                'position': self.drones[drone_id].get('position', {'x': 0, 'y': 0, 'z': 0, 'lat': 0, 'lon': 0}),
                 'battery': self.drones[drone_id].get('battery', 0.0)
             }
+
+    def _reconnect_drone(self, drone_id):
+        """Attempt to reconnect a disconnected drone"""
+        if drone_id in self.connection_ports:
+            try:
+                conn_str = self.connection_ports[drone_id]
+                master = mavutil.mavlink_connection(conn_str)
+                master.wait_heartbeat(timeout=3)
+                
+                self.drones[drone_id] = {
+                    'master': master,
+                    'system': master.target_system,
+                    'component': master.target_component,
+                    'armed': False,
+                    'mode': 'UNKNOWN',
+                    'position': None,
+                    'velocity': None,
+                    'battery': 100.0
+                }
+                
+                logger.info(f"Reconnected to Drone {drone_id}")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to reconnect Drone {drone_id}: {e}")
+        
+        return False    
     
     def start_recording(self):
         """Start recording trajectories for all drones"""
@@ -192,7 +211,16 @@ class EnhancedDroneController:
                 status = self.get_drone_status(drone_id)
                 if status and status['position']:
                     pos = status['position']
-                    
+                    update_drone_status(
+                        drone_id=drone_id,
+                        status='flying' if status['armed'] else 'idle',
+                        armed=status['armed'],
+                        mode=status['mode'],
+                        current_x=pos['x'],
+                        current_y=pos['y'],
+                        current_z=pos['z'],     
+                        battery=status['battery']
+                    )
                     # Add to trajectory database
                     add_trajectory_point(drone_id, pos['x'], pos['y'], pos['z'])
                     
