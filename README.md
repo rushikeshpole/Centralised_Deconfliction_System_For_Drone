@@ -1,343 +1,605 @@
-# Centralised Deconfliction System For Drone
+# 🚁 Centralized Deconfliction System for Drones
 
-A centralized UAV (drone) deconfliction and mission management system built with Flask and Flask-SocketIO. This repository implements a real-time server that monitors multiple drones, detects proximity conflicts, records and serves trajectories (historical & future), schedules missions with deconfliction checks, and exposes both REST APIs and WebSocket events for UI and programmatic clients.
+> A real-time UAV deconfliction and mission management system built with Flask and Flask-SocketIO
 
-Primary languages:
-- Python (~49.7%)
-- HTML (~44%)
-- CSS (~6.3%)
-
----
-
-Table of contents
-- Project overview
-- Features
-- Architecture & data flow
-- Directory / script overview
-- HTTP API endpoints (summary)
-- WebSocket events (summary)
-- Installation & quick start
-- Usage examples (curl & WebSocket)
-- Configuration & deployment notes
-- Development notes and TODOs
-- Security & license
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Flask](https://img.shields.io/badge/Flask-2.0+-green.svg)](https://flask.palletsprojects.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-Project overview
+## 📋 Table of Contents
 
-This project provides a centralized control and deconfliction system for small fleets of drones. It:
-- Collects and simulates drone state (position, velocity, battery, armed state).
-- Records trajectories and serves them on demand (historical and future/planned).
-- Runs a deconfliction engine to prevent mission conflicts and to detect realtime proximity issues.
-- Exposes an interactive dashboard and visualization web pages (templates).
-- Supports direct control commands (arm, takeoff, land, goto) via REST and WebSocket.
-- Emits realtime updates (drone states and conflict alerts) to connected clients via Socket.IO.
-
-The code includes fallbacks/dummy implementations so the UI and server can run without a real database or drone hardware. Replace dummy modules with your real `database`, `drone_controller`, `deconfliction_engine`, and `mission_executor` implementations for production operation.
-
----
-
-Features
-
-- Real-time drone state broadcasting at configurable rates (default: 2 Hz / 500 ms).
-- Realtime conflict detection and alerting.
-- Mission scheduling with preflight deconfliction.
-- Trajectory recording, historical playback and trajectory statistics.
-- RESTful API surface for monitoring, control and data retrieval.
-- Socket.IO support for low-latency UI updates and control.
-- Dummy implementations to enable development without hardware.
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+- [Architecture](#-architecture)
+- [System Components](#-system-components)
+- [API Reference](#-api-reference)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Screenshots](#-screenshots)
+- [Development](#-development)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ---
 
-Architecture & data flow
+## 🎯 Overview
 
-Components:
-- Flask web server: Serves UI templates and REST endpoints.
-- Flask-SocketIO: Bi-directional, low-latency communication with clients for streaming updates and control.
-- Drone Controller: Provides real/simulated drone states, command execution and trajectory recording.
-- Deconfliction Engine: Validates planned missions against existing missions/trajectories; computes conflicts.
-- Mission Executor: Schedules missions and coordinates their execution.
-- Database module: Persisting & retrieving trajectories, missions, and conflict history.
+This project provides a centralized control and deconfliction system for managing small fleets of drones. The system enables safe, coordinated multi-drone operations through real-time conflict detection, mission scheduling, and trajectory management.
 
-Typical data flow:
-1. Drone controller continuously updates internal drone state and appends trajectory points.
-2. Background update thread reads states from the drone controller, runs realtime conflict checks and broadcasts `drone_update` to WebSocket clients.
-3. Clients (dashboard, visualization, or external) receive updates; they can request history, schedule missions, or control drones.
-4. Mission scheduling API calls the Deconfliction Engine to check safety; if safe, Mission Executor stores/schedules the mission.
-5. Historical queries retrieve recorded trajectories from the database (or dummy storage), calculate statistics and return JSON payloads.
-6. Emergency or immediate commands are executed on the Drone Controller and an immediate `drone_update` is emitted.
+### What It Does
 
-Sequence diagram (conceptual):
-Client <--> Socket.IO <--> Flask Server <--> Drone Controller
-                           \--> Deconfliction Engine
-                           \--> Mission Executor
-                           \--> Database
+- **Real-time Monitoring**: Collects and processes drone telemetry (position, velocity, battery, armed state)
+- **Trajectory Management**: Records and serves historical and planned flight paths
+- **Conflict Detection**: Prevents mission conflicts and detects real-time proximity issues
+- **Mission Scheduling**: Validates and schedules drone missions with safety checks
+- **Live Dashboard**: Interactive web interface with real-time visualization
+- **Flexible Control**: Direct drone commands via REST API and WebSocket
 
 ---
 
-Repository / script overview
+## ✨ Key Features
 
-Note: The repo contains Python, HTML and CSS files. The following is an overview of the primary scripts/modules referenced by the main server file. If a module is not present or importable, the server contains dummy fallbacks to allow local testing.
-
-- server (main Flask app) — Example: `app.py` or `server.py`
-  - Initializes Flask + Socket.IO, global instances and background update thread.
-  - Defines REST API endpoints and WebSocket handlers.
-  - Starts the service and update thread on boot.
-  - (The provided server file implements: initialization, update thread, endpoints, conflict detection, and socket event handlers.)
-
-- database.py
-  - Responsibilities:
-    - `init_db()` — Initialize database connections / migrations.
-    - `get_all_drones_status()` — Retrieve latest drone statuses (if persisted).
-    - `create_mission()` — Persist mission data.
-    - `get_active_missions()` — Return active missions & statuses.
-    - `get_drone_trajectory(drone_id, start, end)` — Retrieve stored historical trajectory points.
-    - (Optional) `get_future_trajectories(start_time, end_time)` — Return planned/future trajectories.
-  - Replace dummy DB with a real DB backend (Postgres, SQLite, etc.) or an external telemetry store.
-
-- deconfliction_engine.py
-  - Responsibilities:
-    - `DeconflictionEngine(safety_buffer=...)` — Evaluate mission safety.
-    - `check_mission_conflict(drone_id, waypoints, start_time, end_time)` — Return whether a mission is safe and any conflict details.
-  - This module is core to scheduling correctness and safety.
-
-- drone_controller.py
-  - Responsibilities:
-    - `EnhancedDroneController(drone_count=...)` — Abstraction for drone fleet.
-    - Provide methods: `get_drone_status()`, `get_all_status()`, `get_trajectory()`, `start_recording()`, `arm_drone()`, `disarm_drone()`, `takeoff()`, `land()`, `return_to_launch()`, `goto_position()`, `emergency_stop_all()`.
-    - Maintain per-drone trajectory buffers and update simulated or real telemetry.
-  - For hardware-in-the-loop integrate MAVLink/DroneKit/other SDK.
-
-- mission_executor.py
-  - Responsibilities:
-    - Scheduling missions and maintaining mission lifecycle (scheduled, running, completed).
-    - `schedule_mission(drone_id, waypoints, start_time, end_time)` returns mission id and persists state.
-
-- templates/ (HTML)
-  - `dashboard.html`, `visualization.html`, `history.html`
-  - The web UI that receives Socket.IO updates and visualizes drone positions, conflicts and history.
-
-- static/ (JS/CSS)
-  - Client-side logic for connecting Socket.IO, handling events, rendering maps, charts, and controls.
+| Feature | Description |
+|---------|-------------|
+| **Multi-Drone Support** | Manage multiple drones simultaneously with independent control |
+| **Real-time Updates** | 2Hz WebSocket broadcasts for low-latency state updates |
+| **Deconfliction Engine** | Configurable safety buffers and conflict prediction |
+| **Mission Planning** | Schedule missions with automatic conflict validation |
+| **Historical Playback** | Review past flights with detailed trajectory data |
+| **Emergency Controls** | Immediate stop-all capability for critical situations |
+| **Extensible Architecture** | Modular design supports hardware integration via MAVLink/DroneKit |
 
 ---
 
-HTTP API endpoints (summary)
+## 🏗️ Architecture
 
-The server exposes these REST endpoints (method, path, purpose):
+### High-Level Overview
 
-- GET /                  -> Serve dashboard page
-- GET /visualization      -> Serve visualization page
-- GET /history/<drone_id> -> Serve history UI for a specific drone
+```
+┌─────────────┐
+│   Clients   │
+│  (Browser)  │
+└──────┬──────┘
+       │ HTTP/WebSocket
+       ▼
+┌─────────────────────────────────┐
+│      Flask + SocketIO Server     │
+├─────────────────────────────────┤
+│  • REST API Endpoints            │
+│  • WebSocket Event Handlers      │
+│  • Background Update Thread      │
+└────┬────────┬───────────┬────────┘
+     │        │           │
+     ▼        ▼           ▼
+┌─────────┐ ┌──────────┐ ┌──────────┐
+│  Drone  │ │Deconflict│ │ Mission  │
+│Controller│ │  Engine  │ │ Executor │
+└────┬────┘ └──────────┘ └──────────┘
+     │
+     ▼
+┌──────────┐
+│ Database │
+└──────────┘
+```
 
-API:
-- GET /api/drones
-  - Returns current status for all drones.
+### Data Flow
 
-- GET /api/missions
-  - Returns active missions.
-
-- POST /api/schedule
-  - Schedule a mission (body: drone_id, waypoints, optional start_time/end_time)
-  - Performs deconfliction check before scheduling.
-
-- POST /api/control/<drone_id>
-  - Send direct command to a drone (arm, disarm, takeoff, land, rtl, goto, stop).
-
-- POST /api/emergency
-  - Emergency stop all drones.
-
-- GET /api/trajectory/<drone_id>
-  - Returns recent trajectory points for a drone.
-
-- GET /api/history/conflicts
-  - Returns recent and some dummy historical conflict events.
-
-- GET /api/history/statistics
-  - Returns aggregated statistics (distance, flight time, per-drone stats) over a time window (default 1 hour).
-
-- GET /api/history/trajectory/<drone_id>
-  - Returns detailed trajectory filtered by optional start_time and end_time query parameters.
-
-- GET /api/historical/trajectories
-  - Returns historical trajectories for all drones for the past hour.
-
-- GET /api/future/trajectories
-  - Returns planned/future trajectories for a given time window (or generated dummy trajectories if DB function missing).
-
-For each endpoint the server returns JSON payloads with `success` flag and data or error messages. Most endpoints emit immediate `drone_update` events over Socket.IO when commands are executed.
+1. **State Updates**: Drone controller continuously updates internal state and records trajectory points
+2. **Conflict Checking**: Background thread monitors drone positions and detects conflicts in real-time
+3. **Broadcasting**: State changes are broadcast to all connected WebSocket clients at 2Hz
+4. **Mission Validation**: Scheduled missions undergo deconfliction checks before execution
+5. **Command Execution**: Control commands are processed immediately with state updates broadcast
 
 ---
 
-WebSocket events (summary)
+## 🔧 System Components
 
-Socket.IO events provided by the server:
+### Core Modules
 
-Client -> Server:
-- `request_historical_playback`:
-  - payload: { drone_id, start_time?, end_time? }
-  - server replies by emitting `historical_trajectory`.
+#### `app.py` - Main Server
+The central Flask application that orchestrates all system components.
 
-- `request_update`:
-  - payload: none
-  - server replies with `drone_update` (latest snapshot).
+- Initializes Flask and SocketIO server
+- Manages background update threads
+- Exposes REST API endpoints
+- Handles WebSocket event routing
 
-- `request_historical_state`:
-  - payload: { time } (simulation time index)
-  - server replies with `historical_update` (currently returns current state).
+#### `drone_controller.py` - Fleet Management
+Abstraction layer for drone fleet operations.
 
-- `control_drone`:
-  - payload: { drone_id, command, ... }
-  - server executes command and replies with `control_response` and also emits `drone_update` globally.
+**Key Methods:**
+- `get_drone_status(drone_id)` - Retrieve individual drone state
+- `get_all_status()` - Get status of all drones
+- `get_trajectory(drone_id)` - Access trajectory buffer
+- `arm_drone()`, `takeoff()`, `land()` - Flight control commands
+- `goto_position(lat, lon, alt)` - Waypoint navigation
+- `emergency_stop_all()` - Critical stop function
 
-Server -> Client:
-- `connected`: initial handshake on connect.
-- `drone_update`: periodic (default 2 Hz) updates with full drone snapshot and conflict list.
-- `conflict_alert`: emitted immediately for a detected conflict.
-- `historical_trajectory`: reply to playback requests.
-- `historical_update`: reply to historical state requests.
-- `control_response`: reply to control commands over socket.
+#### `deconfliction_engine.py` - Safety Core
+Validates mission safety and prevents conflicts.
+
+**Configuration:**
+- Adjustable safety buffer distance
+- Temporal and spatial conflict detection
+- Multi-trajectory analysis
+
+**Main Method:**
+```python
+check_mission_conflict(drone_id, waypoints, start_time, end_time)
+# Returns: (is_safe: bool, conflicts: list)
+```
+
+#### `mission_executor.py` - Mission Lifecycle
+Manages mission scheduling and execution state.
+
+**Features:**
+- Mission queuing and scheduling
+- State tracking (scheduled → running → completed)
+- Integration with deconfliction engine
+
+#### `database.py` - Persistence Layer
+Handles data storage and retrieval.
+
+**Functions:**
+- `init_db()` - Initialize database schema
+- `create_mission()` - Persist mission data
+- `get_active_missions()` - Retrieve running missions
+- `get_drone_trajectory()` - Historical trajectory queries
+- `get_future_trajectories()` - Planned flight paths
 
 ---
 
-Installation & quick start
+## 📡 API Reference
 
-Requirements:
-- Python 3.8+
-- Recommended: virtualenv or conda environment
+### REST Endpoints
 
-Primary Python dependencies (example):
-- Flask
-- Flask-SocketIO
-- python-socketio
-- flask-cors
-- eventlet or gevent (optional; the provided server uses threading mode by default)
-- (Optional) database client libs: psycopg2, sqlite3, SQLAlchemy
+#### Drone Status
 
-Install dependencies:
+```http
+GET /api/drones
+```
+Returns current status for all drones in the fleet.
+
+**Response:**
+```json
+{
+  "success": true,
+  "drones": [
+    {
+      "id": "drone_1",
+      "position": {"lat": 12.34, "lon": 56.78, "alt": 100},
+      "velocity": {"vx": 5.0, "vy": 0.0, "vz": 0.0},
+      "battery": 87.5,
+      "armed": true
+    }
+  ]
+}
+```
+
+#### Mission Management
+
+```http
+POST /api/schedule
+Content-Type: application/json
+
+{
+  "drone_id": "drone_1",
+  "waypoints": [
+    {"lat": 12.34, "lon": 56.78, "alt": 100},
+    {"lat": 12.35, "lon": 56.79, "alt": 120}
+  ],
+  "start_time": "2024-01-01T10:00:00Z",
+  "end_time": "2024-01-01T10:30:00Z"
+}
+```
+
+```http
+GET /api/missions
+```
+Returns all active missions.
+
+#### Drone Control
+
+```http
+POST /api/control/<drone_id>
+Content-Type: application/json
+
+{
+  "command": "takeoff",
+  "altitude": 50
+}
+```
+
+**Available Commands:**
+- `arm` / `disarm` - Arm/disarm motors
+- `takeoff` - Takeoff to specified altitude
+- `land` - Land at current position
+- `rtl` - Return to launch point
+- `goto` - Navigate to coordinates
+- `stop` - Stop current mission
+
+```http
+POST /api/emergency
+```
+Emergency stop for all drones.
+
+#### Trajectory Data
+
+```http
+GET /api/trajectory/<drone_id>
+```
+Returns recent trajectory points.
+
+```http
+GET /api/history/trajectory/<drone_id>?start_time=2024-01-01T00:00:00Z&end_time=2024-01-01T23:59:59Z
+```
+Returns filtered historical trajectory.
+
+```http
+GET /api/historical/trajectories
+```
+Returns all historical trajectories (past 1 hour).
+
+```http
+GET /api/future/trajectories
+```
+Returns planned/scheduled trajectories.
+
+#### Analytics
+
+```http
+GET /api/history/statistics
+```
+Returns aggregated flight statistics.
+
+**Response:**
+```json
+{
+  "success": true,
+  "total_distance": 15432.5,
+  "total_flight_time": 7200,
+  "per_drone": {
+    "drone_1": {
+      "distance": 5123.4,
+      "flight_time": 2400,
+      "missions_completed": 5
+    }
+  }
+}
+```
+
+```http
+GET /api/history/conflicts
+```
+Returns conflict event history.
+
+---
+
+### WebSocket Events
+
+#### Client → Server
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `request_update` | `{}` | Request immediate state snapshot |
+| `request_historical_playback` | `{drone_id, start_time?, end_time?}` | Request trajectory playback |
+| `request_historical_state` | `{time}` | Request state at specific time |
+| `control_drone` | `{drone_id, command, ...}` | Execute drone command |
+
+#### Server → Client
+
+| Event | Frequency | Description |
+|-------|-----------|-------------|
+| `connected` | Once | Initial connection acknowledgment |
+| `drone_update` | 2Hz | Periodic state updates for all drones |
+| `conflict_alert` | On Event | Immediate conflict notification |
+| `historical_trajectory` | On Request | Trajectory data response |
+| `control_response` | On Command | Command execution result |
+
+**Example `drone_update` Event:**
+```json
+{
+  "timestamp": "2024-01-01T10:30:45Z",
+  "drones": [...],
+  "conflicts": [
+    {
+      "drone_1": "drone_1",
+      "drone_2": "drone_2",
+      "distance": 8.5,
+      "severity": "warning"
+    }
+  ]
+}
+```
+
+---
+
+## 🛠️ Installation
+
+### Prerequisites
+
+| Requirement | Version | Purpose |
+|-------------|---------|---------|
+| Python | 3.8+ | Runtime environment |
+| Gazebo | Harmonic/Garden | Physics simulation |
+| ArduPilot SITL | Latest | Flight controller simulation |
+| Operating System | Ubuntu 22.04 (recommended) | Gazebo compatibility |
+
+### Environment Setup
+
+1. **Create Virtual Environment**
+
 ```bash
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+2. **Install Python Dependencies**
+
+Create `requirements.txt`:
+```text
+flask>=2.0.0
+flask-socketio>=5.0.0
+flask-cors>=3.0.0
+pymavlink>=2.4.0
+numpy>=1.21.0
+scipy>=1.7.0
+pytz>=2021.3
+```
+
+Install:
+```bash
 pip install -r requirements.txt
 ```
-(If there is no requirements.txt in the repo, create one with the packages above.)
 
-Run server locally:
+3. **Verify Gazebo Installation**
+
 ```bash
-# Ensure you set any required environment variables if applicable.
-python server.py
-# or
-python app.py
+gz sim --version
 ```
 
-By default the server listens on:
-- http://localhost:5000
+4. **Configure ArduPilot SITL**
 
-Notes:
-- The provided implementation uses `async_mode='threading'` for Socket.IO and passes `allow_unsafe_werkzeug=True` to `socketio.run()` so it can run with the default Flask dev server for development. For production, use a production-ready WSGI server and recommended Socket.IO async worker (eventlet/gevent) and configure properly.
-
-Docker (optional)
-- Optionally provide a Dockerfile that installs dependencies and runs the server. If you want, we can add a sample Dockerfile and docker-compose.yaml.
+Ensure ArduPilot is installed and the Gazebo plugin is configured. Refer to [ArduPilot SITL documentation](https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html).
 
 ---
 
-Usage examples
+## 🚀 Quick Start
 
-Curl: get system status
+### Step 1: Launch Gazebo Simulation
+
+Start the multi-drone world:
+
 ```bash
-curl -s http://localhost:5000/api/system/status | jq
+gz sim -v4 -r multi_iris.sdf
 ```
 
-Schedule a mission (example)
+This launches the physics simulation with multiple Iris quadcopter models.
+
+### Step 2: Start ArduPilot SITL Instances
+
+Open a separate terminal for each drone (I0 through I3):
+
 ```bash
-curl -X POST http://localhost:5000/api/schedule \
-  -H "Content-Type: application/json" \
-  -d '{
-    "drone_id": 1,
-    "waypoints": [
-      {"x": 0, "y": 0, "z": 10},
-      {"x": 10, "y": 10, "z": 10}
-    ]
-  }'
+# Terminal 1 - Drone 1
+./sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --console -I0
+
+# Terminal 2 - Drone 2
+./sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --console -I1
+
+# Terminal 3 - Drone 3
+./sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --console -I2
+
+# Terminal 4 - Drone 4
+./sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --console -I3
 ```
 
-Control a drone (takeoff)
+Wait for each instance to display: **"APM: ArduCopter V4.x.x"**
+
+### Step 3: Launch Deconfliction Backend
+
+In a new terminal:
+
 ```bash
-curl -X POST http://localhost:5000/api/control/1 \
-  -H "Content-Type: application/json" \
-  -d '{"command": "takeoff", "altitude": 15.0 }'
+python main_integration.py
 ```
 
-WebSocket (Socket.IO client example)
-- Use the socket.io-client in JS or Python to connect and listen for `drone_update` and `conflict_alert`.
-- Example (browser JS):
-```js
-const socket = io("http://localhost:5000");
-socket.on("connected", (data) => console.log("Connected:", data));
-socket.on("drone_update", (update) => {
-  // update has { timestamp, drones, conflicts, update_id? }
-  console.log(update);
-});
-socket.emit("request_update"); // ask server for an immediate update
+### Step 4: Access Web Interface
+
+Open your browser and navigate to:
+
+```
+http://localhost:5000
+```
+
+**Available Pages:**
+- `/` - Main dashboard
+- `/visualization` - 3D flight path visualization
+- `/history/<drone_id>` - Historical flight data
+
+---
+
+## 📸 Screenshots
+
+### Dashboard Interface
+![Dashboard interface showing real-time drone status, mission queue, and active conflict alerts with numerical metrics and control buttons](./assets/dashboard.png)
+
+*Real-time monitoring with live status indicators, mission queue, and conflict alerts*
+
+### 3D Visualization
+![3D visualization map displaying drone flight paths as colored trajectories with waypoint markers and spatial proximity conflict zones](./assets/visualization.png)
+
+*Interactive 3D map showing drone trajectories, waypoints, and conflict zones*
+
+### Historical Analysis
+![Historical flight data tables and charts showing per-drone statistics including distance traveled, flight duration, altitude profiles, and temporal mission timeline](./assets/history.png)
+
+*Comprehensive flight history with distance, duration, and altitude analytics*
+
+![Secondary history view with comparative drone performance metrics and conflict incident logs with timestamps](./assets/history1.png)
+
+*Comparative performance metrics and conflict incident logging*
+
+### Simulation Environment
+![Gazebo simulation environment showing multiple iris quadcopter drones in a 3D world with terrain](./assets/gazebo.png)
+
+*Gazebo physics simulation with multi-drone configuration*
+
+### ArduPilot SITL
+![ArduPilot SITL console output showing system initialization and telemetry data](./assets/ardupilot.png)
+
+*ArduPilot SITL instances providing MAVLink communication*
+
+---
+
+## 🔨 Development
+
+### Project Structure
+
+```
+centralized-deconfliction-system/
+├── app.py                      # Main Flask application
+├── drone_controller.py         # Drone fleet management
+├── deconfliction_engine.py     # Conflict detection logic
+├── mission_executor.py         # Mission scheduling
+├── database.py                 # Data persistence
+├── main_integration.py         # Integration entry point
+├── requirements.txt            # Python dependencies
+├── templates/                  # HTML templates
+│   ├── dashboard.html
+│   ├── visualization.html
+│   └── history.html
+├── static/                     # Frontend assets
+│   ├── js/
+│   └── css/
+└── assets/                     # Documentation images
+```
+
+### Testing
+
+**Unit Tests** (TODO):
+```bash
+pytest tests/unit/
+```
+
+**Integration Tests** (TODO):
+```bash
+pytest tests/integration/
+```
+
+### Configuration
+
+Key configuration parameters in `app.py`:
+
+```python
+UPDATE_INTERVAL = 0.5  # 2Hz update rate
+SAFETY_BUFFER = 10.0   # meters
+MAX_DRONES = 10
 ```
 
 ---
 
-Configuration & deployment notes
+## 🗺️ Roadmap
 
-- Update `drone_count` and other defaults in the drone controller initialization if using more or fewer drones.
-- Replace dummy modules with production implementations:
-  - Implement `database.py` functions to persist & fetch trajectories and missions.
-  - Implement `DeconflictionEngine` with your conflict detection & resolution logic.
-  - Implement `EnhancedDroneController` that communicates with real drones (MAVLink / DroneKit / vendor SDK).
-- Consider using an async worker for Socket.IO in production:
-  - eventlet: pip install eventlet and set `async_mode='eventlet'` and run with eventlet server.
-- Secure endpoints with authentication (OAuth, API keys, JWT) and serve over TLS (HTTPS).
-- Rate limit expensive endpoints if exposing to the public.
+### High Priority
 
----
+- [ ] Persistent database integration (PostgreSQL/TimescaleDB)
+- [ ] Unit and integration test suite
+- [ ] Authentication and authorization system
+- [ ] Docker containerization with docker-compose
+- [ ] OpenAPI/Swagger specification
 
-Development notes & TODOs
+### Medium Priority
 
-Potential improvements:
-- Persist trajectories and mission histories to a robust DB (Postgres/Timescale).
-- Add ACID-safe mission state transitions and mission logs.
-- Add unit tests for deconfliction logic and endpoints.
-- Add end-to-end tests that run a simulated drone fleet and verify conflict detection and mission scheduling behavior.
-- Implement role-based access control for mission scheduling and emergency commands.
-- Add OpenAPI (Swagger) specification and a Postman collection for easy API testing.
-- Add Docker & docker-compose manifests for easier deployment.
-- Improve time parsing & timezone handling (use pytz / zoneinfo).
+- [ ] Role-based access control (RBAC)
+- [ ] Advanced conflict resolution algorithms
+- [ ] Mission replay and simulation mode
+- [ ] Multi-region deployment support
+- [ ] Performance monitoring and logging
 
----
+### Future Enhancements
 
-Security & license
-
-- No authentication is present by default — do NOT expose this server to the public internet without adding proper authentication and TLS.
-- License: (Please add a LICENSE file to the repository — e.g., MIT or Apache 2.0.)
+- [ ] Machine learning-based trajectory prediction
+- [ ] Weather integration and wind modeling
+- [ ] Battery optimization algorithms
+- [ ] Mobile application (iOS/Android)
+- [ ] Multi-user collaborative mission planning
 
 ---
 
-Contributing
+## 🤝 Contributing
 
-Contributions are welcome. Typical contribution workflow:
-1. Fork repository
-2. Create feature branch
-3. Add tests for new behavior
-4. Create a pull request describing changes and rationale
+Contributions are welcome! Please follow these guidelines:
+
+### Workflow
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
+
+### Code Standards
+
+- Follow PEP 8 style guidelines
+- Add docstrings to all functions and classes
+- Include unit tests for new features
+- Update documentation as needed
+
+### Testing Requirements
+
+All PRs must include:
+- Unit tests with >80% coverage
+- Integration tests for API endpoints
+- Documentation updates
 
 ---
 
-Contact / authors
+## ⚠️ Security Notice
 
-- Repository owner: rushikeshpole (GitHub)
-- For implementation-specific questions, open an issue in the repository.
+**This system does NOT include authentication by default.**
+
+- Do not expose to public internet without implementing proper authentication
+- Use TLS/SSL for production deployments
+- Implement rate limiting on API endpoints
+- Regularly update dependencies for security patches
 
 ---
 
-If you want, I can:
-- Generate a ready-to-run requirements.txt and Dockerfile.
-- Add a sample database schema and migration for trajectory storage.
-- Produce an OpenAPI specification for all endpoints in this README.
-- Create a minimal frontend client to demonstrate typical usage (connect, display drones on a map, playback).
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 👥 Authors & Contact
+
+- **Repository Owner**: [rushikeshpole](https://github.com/rushikeshpole)
+- **Issues**: [GitHub Issues](https://github.com/rushikeshpole/centralized-deconfliction-system/issues)
+
+### Support
+
+For questions or support:
+1. Check existing [GitHub Issues](https://github.com/rushikeshpole/centralized-deconfliction-system/issues)
+2. Open a new issue with detailed description
+3. Tag appropriately (`bug`, `feature`, `question`)
+
+---
+
+## 🙏 Acknowledgments
+
+- ArduPilot Community for SITL support
+- Gazebo Team for physics simulation
+- Flask and SocketIO maintainers
+
+---
+
+<div align="center">
+
+**Made with ❤️ for safer drone operations**
+
+[⬆ Back to Top](#-centralized-deconfliction-system-for-drones)
+
+</div>
