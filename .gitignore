@@ -1,11 +1,8 @@
 # Python bytecode (already causing clutter in your log)
 __pycache__/
 *.pyc
-config.py
-config.yaml
 drones.db
 trajectory_cleaner.py
-requirements.txt
 run.sh
 setup.sh
 # Drone logs and large data files
