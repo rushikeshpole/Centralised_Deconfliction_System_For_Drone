@@ -3,7 +3,10 @@ __pycache__/
 *.pyc
 run.sh
 setup.sh
-
+requirement.txt
+config.py
+config.yaml
+trajectory_cleanup.py
 # Drone logs and large data files
 *.log
 logs/
