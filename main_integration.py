@@ -6,7 +6,6 @@ import sys
 import os
 import signal
 import time
-from datetime import datetime, timezone
 from app import app, socketio, init_system, start_update_thread, system_running
 import pytz
 utc = pytz.UTC

@@ -182,7 +182,7 @@ class DeconflictionEngine:
                 time2 = point2['timestamp']
                 if isinstance(time2, str):
                     try:
-                        time2 = datetime.fromisoformat(time2.replace('Z', '+00:00'))
+                        time2 = datetime.fromisoformat(time2)
                     except ValueError:
                         try:
                             time2 = datetime.strptime(time2, '%Y-%m-%d %H:%M:%S')

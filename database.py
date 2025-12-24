@@ -6,18 +6,47 @@ import json
 from datetime import datetime
 from contextlib import contextmanager
 import logging
+import threading
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 DB_PATH = "drones.db"
+DB_LOCK = threading.Lock()
 
 @contextmanager
 def get_db_connection():
-    """Context manager for database connections"""
-    conn = sqlite3.connect(DB_PATH)
+    """
+    Context manager for database connections.
+
+    - Uses a longer timeout so concurrent writers wait instead of failing.
+    - Enables WAL mode which allows concurrent readers and writers.
+    - Sets busy_timeout so SQLite will retry for a short period.
+    - Commits once on successful exit, rolls back on exception.
+    """
+    # timeout in seconds: allow writers to wait
+    conn = sqlite3.connect(DB_PATH, timeout=30, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
     conn.row_factory = sqlite3.Row
+
     try:
+        # Recommended pragmas for concurrent reader/writer workloads
+        # These are lightweight to run per-connection; journal_mode=WAL is persistent for the DB file.
+        try:
+            conn.execute('PRAGMA journal_mode=WAL;')
+        except Exception as e:
+            logger.debug(f"PRAGMA journal_mode=WAL failed: {e}")
+
+        # Instruct SQLite to wait up to 30 seconds if the DB is locked
+        try:
+            conn.execute('PRAGMA busy_timeout = 30000;')  # milliseconds
+        except Exception as e:
+            logger.debug(f"PRAGMA busy_timeout failed: {e}")
+
+        # Use normal synchronous to balance durability and performance
+        try:
+            conn.execute('PRAGMA synchronous = NORMAL;')
+        except Exception as e:
+            logger.debug(f"PRAGMA synchronous failed: {e}")
+
         yield conn
         conn.commit()
     except Exception as e:
@@ -621,7 +650,7 @@ def get_future_trajectory_by_drone(drone_id):
             timestamp = row[0]
             if isinstance(timestamp, str):
                 try:
-                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    timestamp = datetime.fromisoformat(timestamp)
                 except ValueError:
                     timestamp = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
             
@@ -677,7 +706,7 @@ def get_future_trajectories_for_drone(drone_id, start_time=None, end_time=None):
             timestamp = row[0]
             if isinstance(timestamp, str):
                 try:
-                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    timestamp = datetime.fromisoformat(timestamp)
                 except ValueError:
                     timestamp = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
             

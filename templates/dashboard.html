@@ -583,8 +583,8 @@
             e.preventDefault();
             const droneId = document.getElementById('drone-select').value;
             const waypoints = JSON.parse(document.getElementById('waypoints').value);
-            const startTime = document.getElementById('start-time').value + ':00Z';
-            const endTime = document.getElementById('end-time').value + ':00Z';
+            const startTime = document.getElementById('start-time').value;
+            const endTime = document.getElementById('end-time').value;
 
             const missionData = {
                 drone_id: parseInt(droneId),
@@ -803,8 +803,8 @@
                     </div>
                     <div style="margin-top: 10px; font-size: 0.9rem;">
                         <div><strong>Drone:</strong> ${mission.drone_id}</div>
-                        <div><strong>Start:</strong> ${new Date(mission.start_time).toLocaleString()}</div>
-                        <div><strong>End:</strong> ${new Date(mission.end_time).toLocaleString()}</div>
+                        <div><strong>Start:</strong> ${new Date(mission.start_time).toUTCString()}</div>
+                        <div><strong>End:</strong> ${new Date(mission.end_time).toUTCString()}</div>
                         ${mission.conflict_detected ? '<div style="color: #F44336;"><strong>⚠ Conflict Detected</strong></div>' : ''}
                     </div>
                 `;

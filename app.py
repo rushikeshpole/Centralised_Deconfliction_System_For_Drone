@@ -16,6 +16,9 @@ from collections import deque
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from concurrent.futures import ThreadPoolExecutor
+_background_executor = ThreadPoolExecutor(max_workers=4)
+
 # Import our modules
 try:
     from database import init_db, get_all_drones_status, create_mission, get_active_missions, get_drone_trajectory
@@ -224,6 +227,50 @@ mission_executor = None
 system_running = False
 update_thread = None
 connected_clients = set()
+
+def _schedule_worker(drone_id, waypoints, start_time, end_time, request_meta):
+    """
+    Background worker that performs the expensive conflict checks and mission scheduling.
+    It should log results and (optionally) notify the client via SocketIO when done.
+    """
+    try:
+        # Run deconfliction check (may call DB)
+        conflict_result = deconfliction_engine.check_mission_conflict(
+            drone_id, waypoints, start_time, end_time
+        )
+
+        if not conflict_result.get('safe', True):
+            # Log and notify via SocketIO (or update DB)
+            logger.info(f"Scheduling denied for drone {drone_id} due to conflict: {conflict_result}")
+            # Optionally emit SocketIO event to originating client (use request_meta to find client id)
+            socketio.emit('schedule_result', {
+                'success': False,
+                'conflict': True,
+                'details': conflict_result,
+                'request_id': request_meta.get('request_id')
+            })
+            return
+
+        # Schedule mission (this may insert many rows; mission_executor should use batched DB inserts)
+        mission_id = mission_executor.schedule_mission(
+            drone_id, waypoints, start_time, end_time
+        )
+
+        socketio.emit('schedule_result', {
+            'success': True,
+            'mission_id': mission_id,
+            'message': 'Mission scheduled successfully',
+            'request_id': request_meta.get('request_id')
+        })
+
+    except Exception as e:
+        logger.exception("Error scheduling mission in background")
+        socketio.emit('schedule_result', {
+            'success': False,
+            'error': str(e),
+            'request_id': request_meta.get('request_id')
+        })
+
 
 def init_system():
     """Initialize the deconfliction system"""
@@ -473,8 +520,8 @@ def api_get_history_statistics():
                         altitudes.append(p2.get('z', 0))
                         
                         if 'timestamp' in p1 and 'timestamp' in p2:
-                            t1 = datetime.fromisoformat(p1['timestamp'].replace('Z', '+00:00'))
-                            t2 = datetime.fromisoformat(p2['timestamp'].replace('Z', '+00:00'))
+                            t1 = datetime.fromisoformat(p1['timestamp'])
+                            t2 = datetime.fromisoformat(p2['timestamp'])
                             times.append((t2 - t1).total_seconds())
                     
                     # Calculate flight time
@@ -537,9 +584,9 @@ def api_get_detailed_trajectory(drone_id):
         start_time = end_time - timedelta(hours=1)
         
         if start_time_str:
-            start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+            start_time = datetime.fromisoformat(start_time_str)
         if end_time_str:
-            end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+            end_time = datetime.fromisoformat(end_time_str)
         
         # Get trajectory from controller
         trajectory = drone_controller.get_trajectory(drone_id, limit=limit)
@@ -548,7 +595,7 @@ def api_get_detailed_trajectory(drone_id):
         filtered_trajectory = []
         for point in trajectory:
             try:
-                point_time = datetime.fromisoformat(point.get('timestamp', '').replace('Z', '+00:00'))
+                point_time = datetime.fromisoformat(point.get('timestamp', ''))
                 if start_time <= point_time <= end_time:
                     filtered_trajectory.append(point)
             except:
@@ -602,8 +649,8 @@ def calculate_trajectory_statistics(trajectory):
         # Calculate speed if timestamps are available
         if 'timestamp' in p1 and 'timestamp' in p2:
             try:
-                t1 = datetime.fromisoformat(p1['timestamp'].replace('Z', '+00:00'))
-                t2 = datetime.fromisoformat(p2['timestamp'].replace('Z', '+00:00'))
+                t1 = datetime.fromisoformat(p1['timestamp'])
+                t2 = datetime.fromisoformat(p2['timestamp'])
                 time_diff = (t2 - t1).total_seconds()
                 if time_diff > 0:
                     speeds.append(distance / time_diff)
@@ -677,7 +724,11 @@ def api_schedule_mission():
                 'error': 'Missing required fields: drone_id and waypoints'
             }), 400
         
-        drone_id = int(data['drone_id'])
+        try:
+            drone_id = int(data['drone_id'])
+        except Exception:
+            return jsonify({'success': False, 'error': 'Invalid drone_id'}), 400
+
         waypoints = data['waypoints']
         
         # Parse times with defaults
@@ -685,9 +736,9 @@ def api_schedule_mission():
         end_time = start_time + timedelta(minutes=5)
         
         if 'start_time' in data and data['start_time']:
-            start_time = datetime.fromisoformat(data['start_time'].replace('Z', ''))
+            start_time = datetime.fromisoformat(data['start_time'])
         if 'end_time' in data and data['end_time']:
-            end_time = datetime.fromisoformat(data['end_time'].replace('Z', ''))
+            end_time = datetime.fromisoformat(data['end_time'])
         
         # Validate drone ID
         if drone_id not in [1, 2, 3, 4]:
@@ -697,32 +748,13 @@ def api_schedule_mission():
             }), 400
         
         # Check deconfliction
-        conflict_result = deconfliction_engine.check_mission_conflict(
-            drone_id, waypoints, start_time, end_time
-        )
-        
-        if not conflict_result.get('safe', True):
-            return jsonify({
-                'success': False,
-                'conflict': True,
-                'message': 'Mission conflicts with existing trajectories',
-                'details': conflict_result
-            }), 409
-        
-        # Schedule mission
-        mission_id = mission_executor.schedule_mission(
-            drone_id, waypoints, start_time, end_time
-        )
-        
-        return jsonify({
-            'success': True,
-            'mission_id': mission_id,
-            'message': 'Mission scheduled successfully',
-            'start_time': start_time.isoformat(),
-            'end_time': end_time.isoformat(),
-            'waypoint_count': len(waypoints)
-        })
-        
+        # Enqueue background work. Provide a small request_id so client can match the result event.
+        request_meta = {'request_id': f"req-{int(time.time()*1000)}"}
+        _background_executor.submit(_schedule_worker, drone_id, waypoints, start_time, end_time, request_meta)
+
+        # Return 202 Accepted — scheduling will happen in background. Client may listen for 'schedule_result' SocketIO event.
+        return jsonify({'success': True, 'message': 'Scheduling started', 'request_id': request_meta['request_id']}), 202
+            
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -842,12 +874,6 @@ def api_system_status():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# Add these imports at the top if not already present
-from datetime import datetime, timedelta
-
-# ==================== ADD THESE IMPORTS AT THE TOP ====================
-from datetime import datetime, timedelta
-import math
 
 # ==================== ADD THESE API ENDPOINTS ====================
 
@@ -915,9 +941,9 @@ def api_get_future_trajectories():
         end_time = start_time + timedelta(minutes=30)
         
         if start_time_str:
-            start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+            start_time = datetime.fromisoformat(start_time_str)
         if end_time_str:
-            end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+            end_time = datetime.fromisoformat(end_time_str)
         
         # Get future trajectories from database
         # We need to import or implement get_future_trajectories
@@ -1006,8 +1032,8 @@ def handle_historical_playback(data):
         end_time_str = data.get('end_time')
         
         # Parse times
-        start_time = datetime.fromisoformat(start_time_str.replace('Z', '')) if start_time_str else datetime.now() - timedelta(hours=1)
-        end_time = datetime.fromisoformat(end_time_str.replace('Z', '')) if end_time_str else datetime.now()
+        start_time = datetime.fromisoformat(start_time_str) if start_time_str else datetime.now() - timedelta(hours=1)
+        end_time = datetime.fromisoformat(end_time_str) if end_time_str else datetime.now()
         
         # Get trajectory from database
         trajectory = get_drone_trajectory(drone_id, start_time, end_time)
