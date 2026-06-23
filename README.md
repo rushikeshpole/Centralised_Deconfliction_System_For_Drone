@@ -8,14 +8,15 @@
 
 ---
 
-## 🎥 Project Demonstrations
-[!IMPORTANT] Watch the system in action! These videos demonstrate real-time deconfliction, multi-drone coordination, and the 3D visualization dashboard.
+## 🎥 Demo
 
-Video Link 1: ([Complete Working Of Ui And Centralized Deconfliction System ](https://www.loom.com/share/aef127c57c644ab681813b07a63e2d2c))
+| Video | Link |
+|-------|------|
+| Complete UI + deconfliction system walkthrough | [Watch on Loom](https://www.loom.com/share/aef127c57c644ab681813b07a63e2d2c) |
+| System integration + real-time flight | [Watch on Drive](https://drive.google.com/file/d/1tUT_X_w1pVwQ_xz616rAD3vhMtxcMLYq/view) |
+| Conflict detection + multi-drone dashboard | [Watch on Drive](https://drive.google.com/file/d/1D70UwxZkvkphCUw1X53-z8AvGhQfQyl8/view) |
 
-Video Link 2: ([System Integration & Real-time Flight](https://drive.google.com/file/d/1tUT_X_w1pVwQ_xz616rAD3vhMtxcMLYq/view))
-
-Video Link 3: ([Conflict Detection & Multi-Drone Dashboard](https://drive.google.com/file/d/1D70UwxZkvkphCUw1X53-z8AvGhQfQyl8/view))
+**Stack:** ArduPilot SITL + Gazebo · MAVLink 2.0 · 4 drones · 2 Hz real-time conflict prediction · Flask + SocketIO · Live 3D dashboard
 
 ## 📋 Table of Contents
 
